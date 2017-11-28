@@ -13,7 +13,6 @@ type Bnode struct {
 	Parent   *Bnode
 	Children []*Bnode
 	x, y     float64
-	i        int
 }
 
 type Btree struct {
@@ -171,7 +170,6 @@ func (b *Bnode) get(v int) (*Bnode, int, error) {
 			break
 		}
 	}
-	fmt.Printf("%v %v %v\n", idx, len(b.Val), len(b.Children))
 	ptr = b.Children[idx]
 
 	if found {
@@ -192,7 +190,6 @@ func (b *Bnode) Delete(v, deep int) error {
 	if ptr == nil {
 		return nil
 	}
-	fmt.Printf("Get node %v at %v\n", ptr.Val, idx)
 	idx -= 1
 
 	var leaf bool
@@ -209,6 +206,7 @@ func (b *Bnode) Delete(v, deep int) error {
 
 		ptr.Val = append(ptr.Val[:idx], ptr.Val[idx+1:]...)
 		ptr.Children = append(ptr.Children[:idx], ptr.Children[idx+1:]...)
+
 		min := int(math.Ceil(float64(deep) / 2.0))
 		if len(ptr.Children) < min {
 			ptr.Rebalance(min)
@@ -216,6 +214,7 @@ func (b *Bnode) Delete(v, deep int) error {
 
 	} else {
 		fmt.Println("seperator")
+
 		place, node := ptr.Children[idx].MaxInLeft()
 		if node == nil {
 			fmt.Println("nil")
@@ -225,10 +224,7 @@ func (b *Bnode) Delete(v, deep int) error {
 			ptr.Val[idx] = node.Val[place]
 			node.Val = node.Val[:len(node.Val)-1]
 			node.Children = node.Children[:len(node.Children)-1]
-			/*if len(node.Val) == 0 {
-				node.Children = node.Children[:len(node.Children)-1]
-			}
-			*/
+
 			min := int(math.Ceil(float64(deep) / 2.0))
 			if len(node.Children) < min {
 				node.Rebalance(min)
@@ -388,7 +384,6 @@ func (b *Bnode) Rebalance(n int) {
 				l := b
 
 				l.Val = append(l.Val, v)
-				// l.Children = append(l.Children, nil)
 				l.Val = append(l.Val, r.Val...)
 				l.Children = append(l.Children, r.Children...)
 
@@ -432,7 +427,6 @@ func main() {
 	}
 
 	tree.Root.Dot()
-	return
 	tree.Root.PrintNode()
 	s := strings.Join(records, ",")
 	fmt.Printf("(%v)\n", s)
@@ -449,5 +443,4 @@ func main() {
 		//tree.Root.BeautifulPrint(fmt.Sprintf("%v_%v", 100-i, i))
 	}
 	tree.Root.BeautifulPrint("finish")
-
 }

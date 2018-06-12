@@ -43,6 +43,14 @@ func Test_BTP(t *testing.T) {
 
 	}
 
+	fmt.Println(b.Iter(func(key Key, val interface{}) error {
+		fmt.Println("In interator ", key, val)
+		if !key.Less(Int(258)) && !Int(258).Less(key) {
+			return fmt.Errorf("Stop")
+		}
+		return nil
+	}))
+
 	for i, r := range items {
 		fmt.Println(r)
 		fmt.Printf("Get %v %v\n", r, b.Get(r))

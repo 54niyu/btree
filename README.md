@@ -26,6 +26,14 @@ func main(){
 		items = append(items, Int(r))
 	}
 
+	b.Iter(func(key Key, val interface{}) error {
+		fmt.Println("In interator ", key, val)
+		if !key.Less(Int(258)) && !Int(258).Less(key) {
+			return fmt.Errorf("Stop")
+		}
+		return nil
+	})
+
 	for i, r := range items {
 		fmt.Printf("Get %v %v\n", r, b.Get(r))
 		fmt.Println("Del ", r)

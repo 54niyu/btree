@@ -71,11 +71,35 @@ func (b *BplusTree) Del(key Key) {
 	}
 }
 
-func (b *BplusTree) Iter() {
+type Iterator func(k Key, val interface{}) error
 
+func (b *BplusTree) Iter(f Iterator) error {
+	return b.root.iterator(f)
 }
 
 //------------------------------------------------------------
+
+func (n *node) iterator(f Iterator) error {
+	if n == nil {
+		return nil
+	}
+	if len(n.children) == 0 {
+		for i := range n.keys {
+			err := f(n.keys[i], n.values[i])
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, v := range n.children {
+			err := v.iterator(f)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
 
 func (n *node) index(key Key) (int, bool) {
 	if len(n.keys) == 0 {

@@ -54,16 +54,54 @@ func (t *RBTree) Del(key Key) {
 	if t.root == nil {
 		return
 	}
+	fmt.Println("Del ", key)
 
-	t.root.del(key)
+	t.root = t.root.del(key)
+	if t.root != nil {
+		t.root.red = false
+	}
 	return
 }
 
-func (t *RBTree) Iter() {
+type Iterator func(k Key, val interface{}) error
 
+func (t *RBTree) Iter(f Iterator) error {
+	return t.root.iterator(f)
+}
+
+func (t *RBTree) Hight() {
+	hight(t.root, 0)
+}
+
+func hight(n *rbNode, h int) {
+	if n == nil {
+		fmt.Print(h, " ")
+		return
+	}
+	if !n.red {
+		h += 1
+	}
+	hight(n.left, h)
+	hight(n.right, h)
 }
 
 //-----------------------------------------------------------------------------
+
+func (n *rbNode) iterator(f Iterator) error {
+	if n == nil {
+		return nil
+	}
+	if err := n.left.iterator(f); err != nil {
+		return err
+	}
+	if err := f(n.key, n.val); err != nil {
+		return err
+	}
+	if err := n.right.iterator(f); err != nil {
+		return err
+	}
+	return nil
+}
 
 func (n *rbNode) compare(key Key) int {
 	if key.Less(n.key) {
@@ -74,6 +112,13 @@ func (n *rbNode) compare(key Key) int {
 	} else {
 		return 1
 	}
+}
+
+func (n *rbNode) isRed() bool {
+	if n == nil {
+		return false
+	}
+	return n.red
 }
 
 func (n *rbNode) rotateRight() {
@@ -129,13 +174,6 @@ func (n *rbNode) get(key Key) (val interface{}, found bool) {
 	}
 }
 
-func (n *rbNode) isRed() bool {
-	if n == nil {
-		return false
-	}
-	return n.red
-}
-
 func (n *rbNode) set(key Key, val interface{}) *rbNode {
 	if n == nil {
 		return &rbNode{key: key, val: val, red: true}
@@ -166,9 +204,56 @@ func (n *rbNode) set(key Key, val interface{}) *rbNode {
 	return n
 }
 
+func (n *rbNode) del(key Key) *rbNode {
+	if n == nil {
+		return nil
+	}
+
+	c := n.compare(key)
+	if c == -1 {
+		if n.left != nil && !n.left.isRed() && !n.left.left.isRed() {
+			n.moveRedLeft()
+		}
+		n.left = n.left.del(key)
+	} else {
+		if n.left.isRed() {
+			n.rotateRight()
+			c = n.compare(key)
+		}
+		if c == 0 && n.right == nil {
+			return nil
+		}
+		if n.right != nil && !n.right.isRed() && !n.right.left.isRed() {
+			n.moveRedRight()
+			c = n.compare(key)
+		}
+		if c == 0 {
+			v := n.right.minInRight()
+			n.key = v.key
+			n.val = v.val
+			n.right = n.right.delMin()
+		} else {
+			n.right = n.right.del(key)
+		}
+	}
+
+	n.fixUp()
+	return n
+}
+
+func (n *rbNode) minInRight() *rbNode {
+	ptr := n
+	for {
+		if ptr.left != nil {
+			ptr = ptr.left
+		} else {
+			break
+		}
+	}
+	return ptr
+}
+
 func (n *rbNode) maxInLeft() *rbNode {
-	fmt.Println("in")
-	defer fmt.Println("out")
 	ptr := n
 	for {
 		if ptr.right != nil {
@@ -180,38 +265,63 @@ func (n *rbNode) maxInLeft() *rbNode {
 	return ptr
 }
 
+func (n *rbNode) leanRight() {}
+
+func (n *rbNode) delMin() *rbNode {
+	if n == nil {
+		return nil
+	}
+
+	if n.left == nil {
+		return nil
+	}
+
+	if n.left != nil && !n.left.isRed() && !n.left.left.isRed() {
+		n.moveRedLeft()
+	}
+
+	n.left = n.left.delMin()
+	n.fixUp()
+	return n
+}
+
 func (n *rbNode) delMax() {
 	if n == nil {
 		return
 	}
+
 	if n.left.isRed() {
 		n.rotateRight()
 	}
+
 	if n.right == nil {
 		return
 	}
-	if n.right.isRed() && !n.right.left.isRed() {
+
+	if n.right != nil && !n.right.isRed() && !n.right.left.isRed() {
 		n.moveRedRight()
 	}
-	n.left.delMax()
+
+	n.right.delMax()
 	n.fixUp()
 	return
 }
 
-func (n *rbNode) moveRedRight() {
-	if n == nil {
-		return
-	}
-
-	if n.red {
+func (n *rbNode) moveRedLeft() {
+	n.colorFlip()
+	if n.right != nil && n.right.left.isRed() {
+		n.right.rotateRight()
+		n.rotateLeft()
 		n.colorFlip()
 	}
+}
 
+func (n *rbNode) moveRedRight() {
+	n.colorFlip()
 	if n.left != nil && n.left.left.isRed() {
 		n.rotateRight()
 		n.colorFlip()
 	}
-	return
 }
 
 func (n *rbNode) fixUp() {
@@ -222,51 +332,22 @@ func (n *rbNode) fixUp() {
 		n.rotateRight()
 	}
 	if n.left.isRed() && n.right.isRed() {
-		n.red = true
-		n.left.red = false
-		n.right.red = false
+		n.colorFlip()
 	}
 }
 
-func (n *rbNode) del(key Key) {
-	if n == nil {
-		return
-	}
-
-	c := n.compare(key)
-	switch c {
-	case 0:
-		// do del
-		if n.red {
-			if n.left == nil && n.right == nil {
-				// 直接删除
-				fmt.Println("del", n.key)
-			} else {
-				v := n.maxInLeft()
-				fmt.Println("get max in left ", v.key)
-				n.key = v.key
-				n.val = v.val
-				n.left.delMax()
-			}
-		}
-	case -1:
-		n.left.del(key)
-	case 1:
-		n.right.del(key)
-	}
-	return
-}
-
-func (n *rbNode) I() {
-	if n == nil {
-		return
-	}
-	n.left.I()
-	fmt.Print(n.key, " ")
-	n.right.I()
+func (t *RBTree) I() {
+	t.Iter(Iterator(func(key Key, val interface{}) error {
+		fmt.Print(key, " ")
+		return nil
+	}))
 }
 
 func (n *rbNode) dot() string {
+	if n == nil {
+		return ""
+	}
+
 	tmpl := ""
 	tmpl += fmt.Sprintf("\t\"%p\" [label=\"<f0> | <f1> %v | <f2>\" color=%v shape=record];\n", n, n.key, func() string {
 		if n.red {

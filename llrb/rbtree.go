@@ -54,7 +54,6 @@ func (t *RBTree) Del(key Key) {
 	if t.root == nil {
 		return
 	}
-	fmt.Println("Del ", key)
 
 	t.root = t.root.del(key)
 	if t.root != nil {
@@ -121,38 +120,34 @@ func (n *rbNode) isRed() bool {
 	return n.red
 }
 
-func (n *rbNode) rotateRight() {
+func (n *rbNode) rotateRight() *rbNode {
 
-	l := n.left.left
-	m := n.left.right
-	r := n.right
+	if !n.left.red {
+		panic("rotateRight left is black")
+	}
 
-	n.left.right = r
-	n.left.left = m
+	x := n.left
+	n.left = x.right
+	x.right = n
+	x.red = x.right.red
+	x.right.red = true
 
-	n.right = n.left
-	n.left = l
-
-	t, t2 := n.key, n.val
-	n.key, n.val = n.right.key, n.right.val
-	n.right.key, n.right.val = t, t2
+	return x
 }
 
-func (n *rbNode) rotateLeft() {
+func (n *rbNode) rotateLeft() *rbNode {
 
-	l := n.left
-	m := n.right.left
-	r := n.right.right
+	if !n.right.red {
+		panic("rotateLeft right is black")
+	}
 
-	n.right.left = l
-	n.right.right = m
+	x := n.right
+	n.right = x.left
+	x.left = n
+	x.red = x.left.red
+	x.left.red = true
 
-	n.left = n.right
-	n.right = r
-
-	t, t2 := n.key, n.val
-	n.key, n.val = n.left.key, n.left.val
-	n.left.key, n.left.val = t, t2
+	return x
 }
 
 func (n *rbNode) colorFlip() {
@@ -179,9 +174,12 @@ func (n *rbNode) set(key Key, val interface{}) *rbNode {
 		return &rbNode{key: key, val: val, red: true}
 	}
 
-	if n.left.isRed() && n.right.isRed() {
-		n.colorFlip()
-	}
+	/*
+		2-3-4 tree
+		if n.left.isRed() && n.right.isRed() {
+			n.colorFlip()
+		}
+	*/
 
 	c := n.compare(key)
 	switch c {
@@ -194,11 +192,17 @@ func (n *rbNode) set(key Key, val interface{}) *rbNode {
 	}
 
 	if n.right.isRed() {
-		n.rotateLeft()
+		n = n.rotateLeft()
 	}
 
 	if n.left.isRed() && n.left.left.isRed() {
-		n.rotateRight()
+		n = n.rotateRight()
+	}
+	/*
+		2-3 tree
+	*/
+	if n.left.isRed() && n.right.isRed() {
+		n.colorFlip()
 	}
 
 	return n
@@ -209,25 +213,22 @@ func (n *rbNode) del(key Key) *rbNode {
 		return nil
 	}
 
-	c := n.compare(key)
-	if c == -1 {
+	if key.Less(n.key) {
 		if n.left != nil && !n.left.isRed() && !n.left.left.isRed() {
-			n.moveRedLeft()
+			n = n.moveRedLeft()
 		}
 		n.left = n.left.del(key)
 	} else {
 		if n.left.isRed() {
-			n.rotateRight()
-			c = n.compare(key)
+			n = n.rotateRight()
 		}
-		if c == 0 && n.right == nil {
+		if !n.key.Less(key) && n.right == nil {
 			return nil
 		}
 		if n.right != nil && !n.right.isRed() && !n.right.left.isRed() {
-			n.moveRedRight()
-			c = n.compare(key)
+			n = n.moveRedRight()
 		}
-		if c == 0 {
+		if !n.key.Less(key) {
 			v := n.right.minInRight()
 			n.key = v.key
 			n.val = v.val
@@ -237,7 +238,7 @@ func (n *rbNode) del(key Key) *rbNode {
 		}
 	}
 
-	n.fixUp()
+	n = n.fixUp()
 	return n
 }
 
@@ -277,63 +278,66 @@ func (n *rbNode) delMin() *rbNode {
 	}
 
 	if n.left != nil && !n.left.isRed() && !n.left.left.isRed() {
-		n.moveRedLeft()
+		n = n.moveRedLeft()
 	}
 
 	n.left = n.left.delMin()
-	n.fixUp()
+	n = n.fixUp()
 	return n
 }
 
-func (n *rbNode) delMax() {
+func (n *rbNode) delMax() *rbNode {
 	if n == nil {
-		return
+		return nil
 	}
 
 	if n.left.isRed() {
-		n.rotateRight()
+		n = n.rotateRight()
 	}
 
 	if n.right == nil {
-		return
+		return nil
 	}
 
 	if n.right != nil && !n.right.isRed() && !n.right.left.isRed() {
-		n.moveRedRight()
+		n = n.moveRedRight()
 	}
 
-	n.right.delMax()
-	n.fixUp()
-	return
+	n.right = n.right.delMax()
+	n = n.fixUp()
+	return n
 }
 
-func (n *rbNode) moveRedLeft() {
+func (n *rbNode) moveRedLeft() *rbNode {
 	n.colorFlip()
 	if n.right != nil && n.right.left.isRed() {
-		n.right.rotateRight()
-		n.rotateLeft()
+		n.right = n.right.rotateRight()
+		n = n.rotateLeft()
 		n.colorFlip()
 	}
+	return n
 }
 
-func (n *rbNode) moveRedRight() {
+func (n *rbNode) moveRedRight() *rbNode {
 	n.colorFlip()
 	if n.left != nil && n.left.left.isRed() {
-		n.rotateRight()
+		n = n.rotateRight()
 		n.colorFlip()
 	}
+	return n
 }
 
-func (n *rbNode) fixUp() {
+func (n *rbNode) fixUp() *rbNode {
 	if n.right.isRed() {
-		n.rotateLeft()
+		n = n.rotateLeft()
 	}
 	if n.left.isRed() && n.left.left.isRed() {
-		n.rotateRight()
+		n = n.rotateRight()
 	}
 	if n.left.isRed() && n.right.isRed() {
 		n.colorFlip()
 	}
+	return n
 }
 
 func (t *RBTree) I() {
